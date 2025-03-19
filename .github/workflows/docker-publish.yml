@@ -1,15 +1,13 @@
 name: Docker Image CI/CD
 
 on:
-  workflow_dispatch: 
-    inputs:
-      repo_url:
-        description: 'https://github.com/IUT-Beziers/sae501-502app-spc/tree/QUALV3/Serveur'
-        required: true
-        type: string
+  push:
+    branches: [ "QUALV3" ]  # Le branch où vous faites vos modifications
+  pull_request:
+    branches: [ "QUALV3" ]
 
 jobs:
-  build-and-publish:
+  build-and-test:
     runs-on: ubuntu-latest
     
     permissions:
@@ -17,15 +15,8 @@ jobs:
       packages: write
 
     steps:
-    - name: Checkout this repository
+    - name: Checkout repository
       uses: actions/checkout@v3
-
-    - name: Checkout private repository
-      uses: actions/checkout@v3
-      with:
-        repository: IUT-Beziers/sae501-502app-spc
-        token: ${{ secrets.PRIVATE_REPO_ACCESS_TOKEN }}
-        path: source-repo
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
@@ -37,10 +28,23 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build and push Docker image
+    - name: Build Docker image
       uses: docker/build-push-action@v3
       with:
-        context: ./source-repo  # Pointe vers le dépôt source
+        context: .  # Utilise le Dockerfile du dépôt actuel
+        load: true  # Charge l'image localement pour tests
+        tags: test-image:latest
+
+    - name: Test Docker image
+      run: |
+        # Ajouter ici vos tests
+        docker run --rm test-image:latest /bin/sh -c "python -m pytest" || exit 1
+
+    - name: Push to GitHub Packages
+      uses: docker/build-push-action@v3
+      with:
+        context: .
         push: true
         tags: |
-          ghcr.io/${{ github.repository }}:latest
+          ghcr.io/VOTRE_ORGANISATION/VOTRE_REPO_PUBLIC:latest
+          ghcr.io/VOTRE_ORGANISATION/VOTRE_REPO_PUBLIC:${{ github.sha }}
